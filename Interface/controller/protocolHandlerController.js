@@ -78,6 +78,8 @@ const ErrorLog = require('../model/clsErrorLog');
 const PowerBackup = require('../model/clsPowerBackupModel');
 const clspowerbackup = new PowerBackup();
 const jsonTareCmd = require('../global/tare.json');
+const WTMOdel = require('../model/clsProcessWtModel');
+const wtmodel = new WTMOdel();
 /**
  * handleProtocol() - `this is entry point for all protocol takes two arguments as listed`;
  * @description Below class is comman gateway for input and output to protocols
@@ -842,6 +844,14 @@ class ProtocolHandler {
                                 console.log('err in case LS', err)
                             });
                             break;
+                            case "VL":
+                                var ObjCheckPoweBackUp = await clspowerbackup.fetchPowerBackupData(idsNo);
+                                if (ObjCheckPoweBackUp.status && ObjCheckPoweBackUp.result.length > 0) {
+                                    objMonitor.monit({ case: 'WS', idsNo: idsNo });
+                                    var returnProtocol = await wtmodel.processWS(str_IpAddress.split('.')[3], str_Protocol);
+                                    this.sendProtocol(returnProtocol, str_IpAddress);
+                                }
+                                break;
                         // Menu selection
                         case "MS":
 
