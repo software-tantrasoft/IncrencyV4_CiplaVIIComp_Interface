@@ -1,0 +1,69 @@
+{
+    "Mettler" : [
+        {
+            "Model":"XS203S",
+            "TareCmd":"Z",
+            "SendCmd":"Y"
+        },
+        {
+            "Model":"ML203T/A00",
+            "TareCmd":"Z",
+            "SendCmd":"Y"
+        },
+        {
+            "Model":"BBA422-3SM",
+            "TareCmd":"",
+            "SendCmd":"N"
+        },
+        {
+            "Model":"BBA422-3SIM",
+            "TareCmd":"Z",
+            "SendCmd":"Y"
+        },
+        {
+            "Model":"PG203S",
+            "TareCmd":"T",
+            "SendCmd":"N"
+        },
+        {
+            "Model":"AB204-S/FACT",
+            "TareCmd":"T",
+            "SendCmd":"Y"
+        },
+        {
+            "Model":"Default",
+            "TareCmd":"Z",
+            "SendCmd":"Y"
+        }
+
+
+        
+    ],
+    "Satorious" : [
+        {
+            "Model":"XS",
+            "TareCmd":"Z",
+            "SendCmd":"Y"
+        },
+        {
+            "Model":"SECURA513-10IN",
+            "TareCmd":"T",
+            "SendCmd":"Y"
+        },
+	{
+            "Model":"BCE323I-10IN",
+            "TareCmd":"T",
+            "SendCmd":"Y"
+        },
+	{
+            "Model":"QUINTIX224-10IN",
+            "TareCmd":"T",
+            "SendCmd":"Y"
+        },
+        {
+            "Model":"Default",
+            "TareCmd":"T",
+            "SendCmd":"Y"
+        }
+    ]
+}
