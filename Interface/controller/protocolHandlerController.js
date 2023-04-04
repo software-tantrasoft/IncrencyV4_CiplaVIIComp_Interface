@@ -317,8 +317,7 @@ class ProtocolHandler {
                             break;
                         // // If we get CR from IDS(calibration)
                         case "CR":
-                            this.sendProtocol("CR0", str_IpAddress);
-                            return;
+                           
                             let tempObj = globalData.arrUsers.find(k => k.IdsNo == idsNo);
                             objMonitor.monit({ case: 'ID', idsNo: idsNo, data: tempObj });
 
