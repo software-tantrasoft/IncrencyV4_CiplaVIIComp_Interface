@@ -11742,7 +11742,7 @@ class BulkWeighment {
                                  side = productlimits.Hardness.side == "L" ? "LHS" : "RHS";
                              }
  
-                             await clspowerbackup.insertPowerBackupData(productObj,protocolIncomingType,tempUserObject,IdsNo,"htd","Erweka TBH-425","Hardness");
+                             await clspowerbackup.insertPowerBackupData(currentCubicle,protocolIncomingType,tempUserObject,IdsNo,"htd","Erweka TBH-425","Hardness");
                              var ProductType = globalData.arrProductTypeArray.find(k => k.idsNo == IdsNo)
                              var HardnessUnit = "N";
                              var masterIncopleteData = {
@@ -12098,7 +12098,7 @@ class BulkWeighment {
                                    }
        
                                    await clspowerbackup.insertPowerBackupData(
-                                       productObj,
+                                       currentCubicle,
                                        protocolIncomingType,
                                        tempUserObject,
                                        IdsNo,
