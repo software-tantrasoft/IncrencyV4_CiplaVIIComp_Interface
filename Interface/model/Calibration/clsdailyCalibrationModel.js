@@ -18,7 +18,8 @@ const objInstrumentUsage = new InstrumentUsage();
 const FormulaFunction = require('../Product/clsformulaFun');
 const objFormulaFunction = new FormulaFunction();
 const jsonTareCmd = require('../../global/tare.json');
-
+const ClassCalibPowerBackup = require("../../model/Calibration/clsCalibPowerbackup");
+const CalibPowerBackup = new ClassCalibPowerBackup();
 const objMonitor = new clsMonitor();
 // Creating object for Database Class
 class CalibrationModel {
@@ -343,146 +344,384 @@ class CalibrationModel {
       } else {
         var strBalId = tempCubicInfo.Sys_BinBalID;
       }
-      // calculating below parametes as recieved from CP000
-      var generalCare = str_Protocol.substring(2, 3);
-      var zeroError = str_Protocol.substring(3, 4);
-      var spiritLevel = str_Protocol.substring(4, 5);
-      // If any parameter fails the caibration fails
-      if (generalCare == '1' || zeroError == '1' || spiritLevel == '1') {
-        return "CF";
-      } else {
+      if (str_Protocol.substring(0, 2) == "VI") {
+
         // get all the balance details form 'tbl_balance' in global array :arrBalance
         var selectBalObj = {
-          str_tableName: 'tbl_balance',
-          data: '*',
-          condition: [
-            { str_colName: 'Bal_ID', value: strBalId, comp: 'eq' },
-          ]
-        }
+          str_tableName: "tbl_balance",
+          data: "*",
+          condition: [{ str_colName: "Bal_ID", value: strBalId, comp: "eq" }],
+        };
         var result = await database.select(selectBalObj);
-        var tempBal = globalData.arrBalance.find(k => k.idsNo == IDSSrNo);
+        var tempBal = globalData.arrBalance.find((k) => k.idsNo == IDSSrNo);
         if (tempBal == undefined) {
           globalData.arrBalance.push({
             idsNo: IDSSrNo,
-            balance_info: result[0]
+            balance_info: result[0],
           });
         } else {
           tempBal.balance_info = result[0];
         }
 
-        var tempIM = globalData.arrHexInfo.find(k => k.idsNo == IDSSrNo);
-        var tempBalace = globalData.arrBalance.find(k => k.idsNo == IDSSrNo);
+        var tempIM = globalData.arrHexInfo.find((k) => k.idsNo == IDSSrNo);
+        var tempBalace = globalData.arrBalance.find((k) => k.idsNo == IDSSrNo);
         var TareCmd = "";
 
-        var appendVal = '';
-        if (tempBalace.balance_info[0].Bal_Make.includes('Mettler') || tempBalace.balance_info[0].Bal_Make.includes('METTLER')) {
-          var objTareCmd = jsonTareCmd.Mettler.find(mod => tempBalace.balance_info[0].Bal_Model.includes(mod.Model));
+        var appendVal = "";
+        if (
+          tempBalace.balance_info[0].Bal_Make.includes("Mettler") ||
+          tempBalace.balance_info[0].Bal_Make.includes("METTLER")
+        ) {
+          var objTareCmd = jsonTareCmd.Mettler.find((mod) =>
+            tempBalace.balance_info[0].Bal_Model.includes(mod.Model)
+          );
           if (objTareCmd == undefined) {
-            appendVal = jsonTareCmd.Mettler.find(mod => mod.Model == "Default");
-          }
-          else {
+            appendVal = jsonTareCmd.Mettler.find(
+              (mod) => mod.Model == "Default"
+            );
+          } else {
             appendVal = objTareCmd.TareCmd;
           }
-        }
-        else if (tempBalace.balance_info[0].Bal_Make.includes('Sarto') || tempBalace.balance_info[0].Bal_Make.includes('SARTO')) {
-          var objTareCmd = jsonTareCmd.Satorious.find(mod => tempBalace.balance_info[0].Bal_Model.includes(mod.Model));
+        } else if (
+          tempBalace.balance_info[0].Bal_Make.includes("Sarto") ||
+          tempBalace.balance_info[0].Bal_Make.includes("SARTO")
+        ) {
+          var objTareCmd = jsonTareCmd.Satorious.find((mod) =>
+            tempBalace.balance_info[0].Bal_Model.includes(mod.Model)
+          );
           if (objTareCmd == undefined) {
-            appendVal = jsonTareCmd.Satorious.find(mod => mod.Model == "Default");
-          }
-          else {
+            appendVal = jsonTareCmd.Satorious.find(
+              (mod) => mod.Model == "Default"
+            );
+          } else {
             appendVal = objTareCmd.TareCmd;
           }
-
+        } else {
+          appendVal = "T";
         }
-        else {
-          appendVal = "T"
-        }
-
-
 
         var escChar = String.fromCharCode(27);
         if (tempIM.IM != "IMC3") {
-
-          if (tempCubicInfo.Sys_Area == "Effervescent Granulation" || tempCubicInfo.Sys_Area == "Granulation") {
-            TareCmd = ""
-          }
-          else if (appendVal == "T" && tempBalace.balance_info[0].Bal_Make.includes('Sarto')) {
-            TareCmd = `SP10${escChar}${appendVal},`
-          }
-          else {
-            TareCmd = `SP10${appendVal},`
+          if (
+            tempCubicInfo.Sys_Area == "Effervescent Granulation" ||
+            tempCubicInfo.Sys_Area == "Granulation"
+          ) {
+            TareCmd = "";
+          } else if (
+            appendVal == "T" &&
+            tempBalace.balance_info[0].Bal_Make.includes("Sarto")
+          ) {
+            TareCmd = `SP10${escChar}${appendVal},`;
+          } else {
+            TareCmd = `SP10${appendVal},`;
           }
 
           //this.sendProtocol('SP10Z,', str_IpAddress);
         } else {
-          if (tempCubicInfo.Sys_Area == "Effervescent Granulation" || tempCubicInfo.Sys_Area == "Granulation") {
-            TareCmd = ""
-          }
-          else if (tempBalace.balance_info[0].Bal_Make.includes('Sarto')) {
-            TareCmd = `SP20${escChar}${appendVal},`
-          }
-          else {
-            TareCmd = `SP20${appendVal},`
+          if (
+            tempCubicInfo.Sys_Area == "Effervescent Granulation" ||
+            tempCubicInfo.Sys_Area == "Granulation"
+          ) {
+            TareCmd = "";
+          } else if (tempBalace.balance_info[0].Bal_Make.includes("Sarto")) {
+            TareCmd = `SP20${escChar}${appendVal},`;
+          } else {
+            TareCmd = `SP20${appendVal},`;
           }
           //this.sendProtocol('SP20Z,', str_IpAddress);
         }
-        if (serverConfig.ProjectName == 'RBH') {
+        if (serverConfig.ProjectName == "RBH") {
           TareCmd = "";
         }
         //    console.log('bal', strBalId, tempCubicInfo)
         // Storing all the balance weight details for 'tbl_balance_weights' in global array
         var selectCalibWeights = {
-          str_tableName: 'tbl_balance_weights',
-          data: '*',
+          str_tableName: "tbl_balance_weights",
+          data: "*",
           condition: [
-            { str_colName: 'Bal_ID', value: strBalId, comp: 'eq' },
-            { str_colName: 'Bal_Daily', value: 1, comp: 'eq' }
-          ]
+            { str_colName: "Bal_ID", value: strBalId, comp: "eq" },
+            { str_colName: "Bal_Daily", value: 1, comp: "eq" },
+          ],
+        };
 
-        }
-
-
-        if (serverConfig.ProjectName != 'SunHalolGuj1') {
+        if (serverConfig.ProjectName != "SunHalolGuj1") {
           var order = {
-            order: [
-              { str_colName: 'Bal_StdWt', value: 'ASC' }
-            ]
-          }
-          Object.assign(selectCalibWeights, order)
+            order: [{ str_colName: "Bal_StdWt", value: "ASC" }],
+          };
+          Object.assign(selectCalibWeights, order);
         }
-
 
         var result = await database.select(selectCalibWeights);
-        // If Array of weights is Already present in globalData then we have to update this so we first remove 
+
+        //powerbackup
+        let objFetchcalibpowerbackup =
+          await CalibPowerBackup.fetchCalibPowerBackupData(
+            IDSSrNo,
+            "Daily",
+            strBalId
+          );
+        var selectdetaildaily = {
+          str_tableName: "tbl_calibration_daily_detail_incomplete",
+          data: "*",
+          condition: [
+            {
+              str_colName: "Daily_RepNo",
+              value: objFetchcalibpowerbackup.result[0].Inc_RepSerNo,
+              comp: "eq",
+            },
+          ],
+        };
+        var resultofdetail = await database.select(selectdetaildaily);
+
+        var lengthoftotalstdweight = result[0].length;
+        const searchactualwtarr = [
+          "Daily_ActualWt1",
+          "Daily_ActualWt2",
+          "Daily_ActualWt3",
+          "Daily_ActualWt4",
+          "Daily_ActualWt5",
+          "Daily_ActualWt6",
+          "Daily_ActualWt7",
+          "Daily_ActualWt8",
+        ];
+
+        var sampleidx = 0;
+        var i = 0;
+        var x = "n";
+        var recieveWt;
+        while (i < lengthoftotalstdweight) {
+          for (const key in resultofdetail[0][0]) {
+            if (key == searchactualwtarr[i]) {
+              x = resultofdetail[0][0][key];
+              break;
+            }
+          }
+          if (x == "0.00000" || x == null) {
+            sampleidx = i;
+            x = "n";
+            break;
+          }
+          i++;
+        }
+
+        sampleidx = sampleidx + 1;
+        console.log(sampleidx);
+
+        //activitylog
+        var objActivity = {};
+        var userObj = globalData.arrUsers.find(k => k.IdsNo == IDSSrNo);
+        Object.assign(objActivity,
+          { strUserId: userObj.UserId },
+          {
+            strUserName: userObj.UserName //sarr_UserData[0].UserName 
+          },
+          { activity: `Daily Calibration Resumed on IDS : ${IDSSrNo} through powerbackup` })
+        await objActivityLog.ActivityLogEntry(objActivity);
+
+        //
+        // recieveWt = resultofdetail[0][0][searchactualwtarr[sampleidx - 1]];
+
+        // If Array of weights is Already present in globalData then we have to update this so we first remove
         // and push new one OR Else if not present then we add new one
         var found = globalData.arrBalCalibWeights.some(function (el) {
           return el.idsNo == IDSSrNo;
         });
         if (found) {
-          const tempObj = globalData.arrBalCalibWeights.find(k => k.idsNo == IDSSrNo);
+          const tempObj = globalData.arrBalCalibWeights.find(
+            (k) => k.idsNo == IDSSrNo
+          );
           // removing Current obj
           var index = globalData.arrBalCalibWeights.indexOf(tempObj);
           if (index !== -1) globalData.arrBalCalibWeights.splice(index, 1);
           globalData.arrBalCalibWeights.push({
             idsNo: IDSSrNo,
-            calibWt: result[0] // array
-          })
+            calibWt: result[0], // array
+          });
         } else {
           globalData.arrBalCalibWeights.push({
             idsNo: IDSSrNo,
-            calibWt: result[0] // array
-          })
+            calibWt: result[0], // array
+          });
         }
         // console.log(globalData.arrBalCalibWeights)
         // sending first weight for calibration
         // Instrument Usage log for balance start
-        await objInstrumentUsage.InstrumentUsage('Balance', IDSSrNo, 'tbl_instrumentlog_balance', 'Daily Calibration', 'started');
+        await objInstrumentUsage.InstrumentUsage(
+          "Balance",
+          IDSSrNo,
+          "tbl_instrumentlog_balance",
+          "Daily Calibration",
+          "started"
+        );
 
-        var strunit = tempBalace.balance_info[0].Bal_Unit.trim()
-        return 'CB01' + objFormulaFunction.FormatNumberString(result[0][0].Bal_StdWt, tempBalace.balance_info[0].Bal_DP)
-          + strunit + `, 0.000,Daily Calib,${TareCmd}`;
+        var strunit = tempBalace.balance_info[0].Bal_Unit.trim();
+
+        if (sampleidx > 9) {
+          return (
+            `CB` + sampleidx +
+            objFormulaFunction.FormatNumberString(
+              result[0][sampleidx - 1].Bal_StdWt,
+              tempBalace.balance_info[0].Bal_DP
+            ) +
+            strunit +
+            `, 0.000,Daily Calib,${TareCmd}`
+          );
+        } else {
+          return (
+            `CB0` + sampleidx +
+            objFormulaFunction.FormatNumberString(
+              result[0][sampleidx - 1].Bal_StdWt,
+              tempBalace.balance_info[0].Bal_DP
+            ) +
+            strunit +
+            `, 0.000,Daily Calib,${TareCmd}`
+          );
+        }
+
+        // protocolToBeSend = "CB0" + srNotobepalced + objFormulaFunction.FormatNumberString(objIdsrelWt.calibWt[parseInt(srNo)].Bal_StdWt, balanceInfo.Bal_DP) + balanceInfo.Bal_Unit + ", " + recieveWt + ",Daily Calib,";
+      }
+      else {
+        // calculating below parametes as recieved from CP000
+        var generalCare = str_Protocol.substring(2, 3);
+        var zeroError = str_Protocol.substring(3, 4);
+        var spiritLevel = str_Protocol.substring(4, 5);
+        // If any parameter fails the caibration fails
+        if (generalCare == '1' || zeroError == '1' || spiritLevel == '1') {
+          return "CF";
+        } else {
+          // get all the balance details form 'tbl_balance' in global array :arrBalance
+          var selectBalObj = {
+            str_tableName: 'tbl_balance',
+            data: '*',
+            condition: [
+              { str_colName: 'Bal_ID', value: strBalId, comp: 'eq' },
+            ]
+          }
+          var result = await database.select(selectBalObj);
+          var tempBal = globalData.arrBalance.find(k => k.idsNo == IDSSrNo);
+          if (tempBal == undefined) {
+            globalData.arrBalance.push({
+              idsNo: IDSSrNo,
+              balance_info: result[0]
+            });
+          } else {
+            tempBal.balance_info = result[0];
+          }
+
+          var tempIM = globalData.arrHexInfo.find(k => k.idsNo == IDSSrNo);
+          var tempBalace = globalData.arrBalance.find(k => k.idsNo == IDSSrNo);
+          var TareCmd = "";
+
+          var appendVal = '';
+          if (tempBalace.balance_info[0].Bal_Make.includes('Mettler') || tempBalace.balance_info[0].Bal_Make.includes('METTLER')) {
+            var objTareCmd = jsonTareCmd.Mettler.find(mod => tempBalace.balance_info[0].Bal_Model.includes(mod.Model));
+            if (objTareCmd == undefined) {
+              appendVal = jsonTareCmd.Mettler.find(mod => mod.Model == "Default");
+            }
+            else {
+              appendVal = objTareCmd.TareCmd;
+            }
+          }
+          else if (tempBalace.balance_info[0].Bal_Make.includes('Sarto') || tempBalace.balance_info[0].Bal_Make.includes('SARTO')) {
+            var objTareCmd = jsonTareCmd.Satorious.find(mod => tempBalace.balance_info[0].Bal_Model.includes(mod.Model));
+            if (objTareCmd == undefined) {
+              appendVal = jsonTareCmd.Satorious.find(mod => mod.Model == "Default");
+            }
+            else {
+              appendVal = objTareCmd.TareCmd;
+            }
+
+          }
+          else {
+            appendVal = "T"
+          }
 
 
+
+          var escChar = String.fromCharCode(27);
+          if (tempIM.IM != "IMC3") {
+
+            if (tempCubicInfo.Sys_Area == "Effervescent Granulation" || tempCubicInfo.Sys_Area == "Granulation") {
+              TareCmd = ""
+            }
+            else if (appendVal == "T" && tempBalace.balance_info[0].Bal_Make.includes('Sarto')) {
+              TareCmd = `SP10${escChar}${appendVal},`
+            }
+            else {
+              TareCmd = `SP10${appendVal},`
+            }
+
+            //this.sendProtocol('SP10Z,', str_IpAddress);
+          } else {
+            if (tempCubicInfo.Sys_Area == "Effervescent Granulation" || tempCubicInfo.Sys_Area == "Granulation") {
+              TareCmd = ""
+            }
+            else if (tempBalace.balance_info[0].Bal_Make.includes('Sarto')) {
+              TareCmd = `SP20${escChar}${appendVal},`
+            }
+            else {
+              TareCmd = `SP20${appendVal},`
+            }
+            //this.sendProtocol('SP20Z,', str_IpAddress);
+          }
+          if (serverConfig.ProjectName == 'RBH') {
+            TareCmd = "";
+          }
+          //    console.log('bal', strBalId, tempCubicInfo)
+          // Storing all the balance weight details for 'tbl_balance_weights' in global array
+          var selectCalibWeights = {
+            str_tableName: 'tbl_balance_weights',
+            data: '*',
+            condition: [
+              { str_colName: 'Bal_ID', value: strBalId, comp: 'eq' },
+              { str_colName: 'Bal_Daily', value: 1, comp: 'eq' }
+            ]
+
+          }
+
+
+          if (serverConfig.ProjectName != 'SunHalolGuj1') {
+            var order = {
+              order: [
+                { str_colName: 'Bal_StdWt', value: 'ASC' }
+              ]
+            }
+            Object.assign(selectCalibWeights, order)
+          }
+
+
+          var result = await database.select(selectCalibWeights);
+          // If Array of weights is Already present in globalData then we have to update this so we first remove 
+          // and push new one OR Else if not present then we add new one
+          var found = globalData.arrBalCalibWeights.some(function (el) {
+            return el.idsNo == IDSSrNo;
+          });
+          if (found) {
+            const tempObj = globalData.arrBalCalibWeights.find(k => k.idsNo == IDSSrNo);
+            // removing Current obj
+            var index = globalData.arrBalCalibWeights.indexOf(tempObj);
+            if (index !== -1) globalData.arrBalCalibWeights.splice(index, 1);
+            globalData.arrBalCalibWeights.push({
+              idsNo: IDSSrNo,
+              calibWt: result[0] // array
+            })
+          } else {
+            globalData.arrBalCalibWeights.push({
+              idsNo: IDSSrNo,
+              calibWt: result[0] // array
+            })
+          }
+          // console.log(globalData.arrBalCalibWeights)
+          // sending first weight for calibration
+          // Instrument Usage log for balance start
+          await objInstrumentUsage.InstrumentUsage('Balance', IDSSrNo, 'tbl_instrumentlog_balance', 'Daily Calibration', 'started');
+
+          var strunit = tempBalace.balance_info[0].Bal_Unit.trim()
+          return 'CB01' + objFormulaFunction.FormatNumberString(result[0][0].Bal_StdWt, tempBalace.balance_info[0].Bal_DP)
+            + strunit + `, 0.000,Daily Calib,${TareCmd}`;
+
+
+        }
       }
     } catch (err) {
       console.log("Error from getCalibWeights of Daily", err)
@@ -698,6 +937,14 @@ class CalibrationModel {
           }
           // inserting data in incomplete daily table
           var res = await database.save(insertDetailObj)
+          //powerbackup insertion
+          var data = await CalibPowerBackup.insertCalibPowerBackupData(
+            intDaily_RepNo,
+            "Daily",
+            balanceInfo.Bal_ID,
+            IDSSrNo
+          );
+          //
           var wt = str_Protocol.split(',')[1].trim().split(' ')[0];
           objMonitor.monit({ case: 'CB', idsNo: IDSSrNo, data: { Weight: wt } });
 
@@ -801,30 +1048,10 @@ class CalibrationModel {
               return el.BalId == strBalId;
             });
             BalanceRecalibStatusObject.DailyBalRecalib = 0;
-            // if (found) {
-            //     var result = await checkForPenCal.checkForPendingCalib(strBalId, IDSSrNo)
-            //     if (result == "CR0") {
 
-            //         if (BalanceRecalibStatusObject.PeriodicBalRecalib == 1) {
-            //             let TempCalibType = globalData.arrcalibType.find(k => k.idsNo == IDSSrNo);
-            //             if (TempCalibType != undefined) {
-            //                 TempCalibType.calibType = 'periodic';
-            //             } else {
-            //                 globalData.arrcalibType.push({ idsNo: IDSSrNo, calibType: 'periodic' })
-            //             }
-            //             await fetchDetails.pushCalibrationObj(strBalId);
-            //             RepFromPC = 'CR20PERIODIC CALIB,PENDING FOR BALANCE,,,'
-            //             //resolve('CR20PERIODIC CALIB,PENDING FOR BALANCE,,,');
-            //         }
-            //     } else {
-            //         RepFromPC = result;
-            //     }
+            //POWERBACKUP DISCARD
+            await CalibPowerBackup.deleteCalibPowerBackupData("1", IDSSrNo);
 
-
-            //     //retunr (result)
-
-            // } 
-            //else {
             if (serverConfig.ProjectName == 'SunHalolGuj1' || serverConfig.ProjectName == "MLVeer") {
               var Response = await checkForPenCal.checkIfTodayIsPeriodicCalib(IDSSrNo);
               if (Response) {
@@ -892,6 +1119,7 @@ class CalibrationModel {
           }
           else {
             objFailedFlag.failFlagDaily = true;
+            await CalibPowerBackup.deleteCalibPowerBackupData("1", IDSSrNo);
             return 'CF';
           }
         } else {
@@ -917,6 +1145,7 @@ class CalibrationModel {
         } else {
           objFailedFlag.failFlagDaily = true;
           await objInstrumentUsage.InstrumentUsage('Balance', IDSSrNo, 'tbl_instrumentlog_balance', '', 'completed');
+          await CalibPowerBackup.deleteCalibPowerBackupData("1", IDSSrNo);
           return 'CF';
         }
 

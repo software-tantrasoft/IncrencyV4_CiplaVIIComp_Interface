@@ -80,6 +80,8 @@ const clspowerbackup = new PowerBackup();
 const jsonTareCmd = require('../global/tare.json');
 const WTMOdel = require('../model/clsProcessWtModel');
 const wtmodel = new WTMOdel();
+const ClassCalibPowerBackup = require("../model/Calibration/clsCalibPowerbackup");
+const CalibPowerBackup = new ClassCalibPowerBackup();
 /**
  * handleProtocol() - `this is entry point for all protocol takes two arguments as listed`;
  * @description Below class is comman gateway for input and output to protocols
@@ -463,7 +465,94 @@ class ProtocolHandler {
                                             await database.update(objUpdateCubicle);
 
                                             strReturnProtocol = strReturnProtocol.substring(0, strReturnProtocol.length - 1)
-                                            this.sendProtocol(strReturnProtocol, str_IpAddress);
+
+                                            //sending powerbackup
+                                            var calibtype = strReturnProtocol.substring(2, 3);
+                                            switch (calibtype) {
+                                                case "1":
+                                                    calibtype = "Daily";
+                                                    break;
+                                                case "2":
+                                                    calibtype = "Periodic";
+                                                    break;
+                                                case "E":
+                                                    calibtype = "Eccentricity";
+                                                    break;
+                                                case "R":
+                                                    calibtype = "Repeatability";
+                                                    break;
+                                                case "U":
+                                                    calibtype = "Uncertainty";
+                                                    break;
+                                            }
+                                            let objFetchcalibpowerbackup =
+                                                await CalibPowerBackup.fetchCalibPowerBackupData(
+                                                    idsNo,
+                                                    calibtype,
+                                                    tempBalace
+                                                );
+                                            if (
+                                                objFetchcalibpowerbackup.status &&
+                                                objFetchcalibpowerbackup.result.length > 0
+                                            ) {
+                                                strReturnProtocol =
+                                                    await CalibPowerBackup.sendCalibPowerBackupData(
+                                                        strReturnProtocol,
+                                                        objFetchcalibpowerbackup.result,
+                                                        idsNo,
+                                                        str_IpAddress
+                                                    );
+                                            } else {
+                                                //clearing of different user entry if entry is not present in calibrationpowerbackup table
+                                                var tempCalibStatus = globalData.calibrationStatus.find(
+                                                    (k) => k.BalId == tempBalace
+                                                );
+                                                const tempUserObject = globalData.arrUsers.find(
+                                                    (k) => k.IdsNo == idsNo
+                                                );
+                                                var curruser = tempUserObject.UserId;
+                                                var calibrationentrypresent = false;
+                                                var differentuserentrypresent = false;
+
+                                                for (var i in tempCalibStatus.status) {
+                                                    if (tempCalibStatus.status[i] == "1") {
+                                                        calibrationentrypresent = true;
+                                                        break;
+                                                    }
+                                                }
+                                                if (calibrationentrypresent) {
+                                                    var selectCalibData = {
+                                                        str_tableName:
+                                                            "tbl_calibration_periodic_master_incomplete",
+                                                        data: "*",
+                                                        condition: [
+                                                            // { str_colName: "IdsNo", value: IdsNo },
+                                                            {
+                                                                str_colName: "Periodic_BalID",
+                                                                value: tempBalace,
+                                                            },
+                                                        ],
+                                                    };
+                                                    var result = await database.select(selectCalibData);
+                                                    if (result[0][0].Periodic_UserID != curruser) {
+                                                        differentuserentrypresent = true;
+                                                    }
+                                                }
+
+                                                if (differentuserentrypresent) {
+                                                    await CalibPowerBackup.movingtocalibfailafterlogindifferrentUser(
+                                                        tempBalace,
+                                                        idsNo
+                                                    );
+                                                    strReturnProtocol = "DIFUSER";
+                                                }
+                                            }
+                                            if (strReturnProtocol == "DIFUSER") {
+                                                this.handleProtocol("CRN￻", str_IpAddress, "");
+                                            } else {
+                                                this.sendProtocol(strReturnProtocol, str_IpAddress);
+                                            }
+
                                         } else {
                                             //message change for mesage validation*******************
                                             // this.sendProtocol("ID3 YOU DONT HAVE,CALIBRATION RIGHT,,", str_IpAddress);
@@ -674,6 +763,84 @@ class ProtocolHandler {
                             }
 
                             break;
+
+                        //calibration Powerbackup
+                        case "VI":
+                            var powerbackuptype = str_Protocol.substring(3, 4);
+                            var tempCubicInfo = globalData.arrIdsInfo.find(
+                                (ids) => ids.Sys_IDSNo == idsNo
+                            );
+
+                            var CalibrationType = str_Protocol.substring(2, 3);
+                            if (powerbackuptype == "0") {
+                                await CalibPowerBackup.deleteCalibPowerBackupData(
+                                    CalibrationType,
+                                    idsNo
+                                );
+
+                                if (
+                                    CalibrationType != "1" &&
+                                    CalibrationType != "4"
+                                ) {
+                                    await CalibPowerBackup.movingtocalibfailaftercalibpowerbackupdiscard(
+                                        CalibrationType,
+                                        idsNo
+                                    );
+                                }
+                                console.log("calibpowerbakup discard");
+                                //activitylog
+                                var calibrationname = "";
+                                switch (CalibrationType) {
+                                    case "1":
+                                    case "4":
+                                        calibrationname = "Daily";
+                                        break;
+
+                                    case "2":
+                                    case "5":
+                                        calibrationname = "Periodic";
+                                        break;
+
+                                    case "E":
+                                        calibrationname = "Eccentricity";
+                                        break;
+
+                                    case "R":
+                                        calibrationname = "Repeatability";
+                                        break;
+                                    case "U":
+                                        calibrationname = "Uncertainty";
+                                        break;
+                                }
+
+                                var objActivity = {};
+                                var userObj = globalData.arrUsers.find((k) => k.IdsNo == idsNo);
+                                Object.assign(
+                                    objActivity,
+                                    { strUserId: userObj.UserId },
+                                    {
+                                        strUserName: userObj.UserName, //sarr_UserData[0].UserName
+                                    },
+                                    {
+                                        activity:
+                                            `${calibrationname}  Calibration Discarded on IDS ` +
+                                            idsNo,
+                                    }
+                                );
+                                await objActivityLog.ActivityLogEntry(objActivity);
+                                //
+
+                                this.handleProtocol("CRN￻", str_IpAddress, "");
+                            } else {
+                                var strReturnProtocol = await caliDecider.calibPendingDecider(
+                                    str_Protocol,
+                                    str_IpAddress.split(".")[3]
+                                );
+                                this.sendProtocol(strReturnProtocol, str_IpAddress);
+                                break;
+                            }
+                            break;
+
                         // For menu Printing
                         case "MP":
                             var tempVerify = await objCommanFun.calibrationVerification(idsNo);
@@ -784,9 +951,9 @@ class ProtocolHandler {
                                     let objFetchpowerbackup = await clspowerbackup.fetchPowerBackupData(idsNo);
                                     if (objFetchpowerbackup.status && objFetchpowerbackup.result.length > 0) {
                                         var protocol = await clspowerbackup.sendPowerBackupData(objFetchpowerbackup.result, idsNo);
-                                        if(protocol == 'MR'){
+                                        if (protocol == 'MR') {
                                             this.handleProtocol('MRN￻', str_IpAddress, '');
-                                        }else {
+                                        } else {
                                             this.sendProtocol(protocol, str_IpAddress);
                                         }
                                         await handleLoginModal.updateWeighmentStatus(idsNo, 1);
@@ -843,14 +1010,14 @@ class ProtocolHandler {
                                 console.log('err in case LS', err)
                             });
                             break;
-                            case "VL":
-                                var ObjCheckPoweBackUp = await clspowerbackup.fetchPowerBackupData(idsNo);
-                                if (ObjCheckPoweBackUp.status && ObjCheckPoweBackUp.result.length > 0) {
-                                    objMonitor.monit({ case: 'WS', idsNo: idsNo });
-                                    var returnProtocol = await wtmodel.processWS(str_IpAddress.split('.')[3], str_Protocol);
-                                    this.sendProtocol(returnProtocol, str_IpAddress);
-                                }
-                                break;
+                        case "VL":
+                            var ObjCheckPoweBackUp = await clspowerbackup.fetchPowerBackupData(idsNo);
+                            if (ObjCheckPoweBackUp.status && ObjCheckPoweBackUp.result.length > 0) {
+                                objMonitor.monit({ case: 'WS', idsNo: idsNo });
+                                var returnProtocol = await wtmodel.processWS(str_IpAddress.split('.')[3], str_Protocol);
+                                this.sendProtocol(returnProtocol, str_IpAddress);
+                            }
+                            break;
                         // Menu selection
                         case "MS":
 
@@ -1135,7 +1302,7 @@ class ProtocolHandler {
 
                                 }
 
-                                var response = await objRemarkInComplete.checkEntry(idsNo ,selectedIds, 0, testType);
+                                var response = await objRemarkInComplete.checkEntry(idsNo, selectedIds, 0, testType);
                                 if (response != false) {
                                     var actualData = `ID3 Remark Pending For,${response.param.toUpperCase()} Test,,`;
 
@@ -1293,6 +1460,11 @@ class ProtocolHandler {
                             break;
                         case "LO":
                             var logOutType = str_Protocol.substring(2, 3);
+                            if (logOutType == "U") {
+                                await CalibPowerBackup.deletepowerbackupaftercalibterminated(
+                                    idsNo
+                                );
+                            }
                             await objIncompleteRemark.updateReportRemarkOnLO(idsNo);
                             await handleLoginModal.logOut(str_IpAddress.split('.')[3], logOutType);
                             this.sendProtocol('+', str_IpAddress);
@@ -1615,7 +1787,7 @@ class ProtocolHandler {
                             objMonitor.monit({ case: 'CL', idsNo: idsNo });
                             await menuSelectModel.handleCLProtocol(idsNo);
                             var weightment_type = str_Protocol.substring(2, 3);
-                            await objCommanFun.updateactivitylogfortesttermination(idsNo,weightment_type);
+                            await objCommanFun.updateactivitylogfortesttermination(idsNo, weightment_type);
                             await objIncompleteRemark.updateReportRemark(idsNo);
                             console.log('powerback up clear after cl');
                             await clspowerbackup.deletePowerBackupData(idsNo);
@@ -1858,10 +2030,10 @@ class ProtocolHandler {
                     } else if (DTModel == 'Electrolab-ED3PO') {
                         var returnProtocol = await bulkWeighment.insertBulkWeighmentDTED3PO(idsNo, str_Protocol);
                         this.sendProtocol(returnProtocol, str_IpAddress);
-                    } else if(DTModel == 'Electrolab EDI-2SA'){
+                    } else if (DTModel == 'Electrolab EDI-2SA') {
                         var returnProtocol = await bulkWeighment.insertBulkWeighmentDTEDI2SABolus(idsNo, str_Protocol);
                         this.sendProtocol(returnProtocol, str_IpAddress);
-                    }else {
+                    } else {
                         var returnProtocol = await bulkWeighment.insertBulkWeighmentDT(idsNo, str_Protocol, DTModel);
                         this.sendProtocol(returnProtocol, str_IpAddress);
                     }

@@ -12,6 +12,8 @@ var logFromPC = require('../model/clsLogger');
 const sort = require('../model/Calibration/checkForPendingCalib');
 const PreCalibCheck = require('./clsPreWeighmentChecks');
 const clsPreWeighmentChecks = new PreCalibCheck();
+const ClassCalibPowerBackup = require("../model/Calibration/clsCalibPowerbackup");
+const CalibPowerBackup = new ClassCalibPowerBackup();
 let now = new Date();
 /**
  * @description Class to call startUp function
@@ -32,42 +34,42 @@ class FetchDetails {
             ).catch(err => { console.log(err) })
         })
     }
-   
+
     /**
      * @param {mode : Mode of IP // IDS or Hardness}
      */
     async getIPTCP(ip, mode) {
         try {
-            if(mode == 'ids') {
+            if (mode == 'ids') {
                 let selectOther = {
-                    str_tableName:'tbl_otherequipment',
-                    data:'*',
+                    str_tableName: 'tbl_otherequipment',
+                    data: '*',
                     condition: [
-                        {str_colName:'Eqp_IP', value:ip}
+                        { str_colName: 'Eqp_IP', value: ip }
                     ]
                 }
                 let resultOther = await database.select(selectOther);
                 let nameOfEq = resultOther[0][0].Eqp_ID;
                 let selectCubicle = {
-                    str_tableName:'tbl_cubical',
-                    data:'*',
-                    condition: [{str_colName:'Sys_HardID', value:nameOfEq}]
+                    str_tableName: 'tbl_cubical',
+                    data: '*',
+                    condition: [{ str_colName: 'Sys_HardID', value: nameOfEq }]
                 }
                 let IDSRes = await database.select(selectCubicle);
                 return IDSRes[0][0].Sys_IDSNo;
             } else {
                 let selectCubicle = {
-                    str_tableName:'tbl_cubical',
-                    data:'*',
-                    condition: [{str_colName:'Sys_IDSNo', value:ip}]
+                    str_tableName: 'tbl_cubical',
+                    data: '*',
+                    condition: [{ str_colName: 'Sys_IDSNo', value: ip }]
                 }
                 let IDSRes = await database.select(selectCubicle);
                 let hardnessId = IDSRes[0][0].Sys_HardID;
                 let selectOther = {
-                    str_tableName:'tbl_otherequipment',
-                    data:'*',
+                    str_tableName: 'tbl_otherequipment',
+                    data: '*',
                     condition: [
-                        {str_colName:'Eqp_ID', value:hardnessId}
+                        { str_colName: 'Eqp_ID', value: hardnessId }
                     ]
                 }
                 let otherEqRes = await database.select(selectOther);
@@ -78,7 +80,7 @@ class FetchDetails {
             throw new Error(err);
         }
     }
-     // *****************************************************************************************************8//
+    // *****************************************************************************************************8//
     // Below function gets all parameters from tbl_config
     //****************************************************************************************************** */
     getAllParameters() {
@@ -1117,22 +1119,293 @@ class FetchDetails {
                             condition: [{ str_colName: 'Bal_ID', value: balance }]
                         }
                         await database.update(objUpdate);
+
+                        ///clearing powerbackup if (recalib periodic) entry is in powerbackup;
+                        var selectCalibPowerBackupData = {
+                            str_tableName: "tbl_calibpowerbackup",
+                            data: "*",
+                            condition: [
+                                { str_colName: "IdsNo", value: idsNo },
+                                { str_colName: "BalanceID", value: balance },
+                            ],
+                        };
+                        var result = await database.select(selectCalibPowerBackupData);
+                        if (result[0].length > 0) {
+                            var deleteObj = {
+                                str_tableName: "tbl_calibpowerbackup",
+                                condition: [
+                                    { str_colName: "IdsNo", value: idsNo },
+                                    { str_colName: "BalanceID", value: balance },
+                                ],
+                            };
+                            console.log(
+                                "calibpowerbackup discard  of recalibration on IDS " + idsNo
+                            );
+                            await database.delete(deleteObj);
+
+                            var CalibrationType = result[0][0].CalibrationType;
+                            if (CalibrationType != "Daily") {
+                                var repnofordelete =
+                                    await CalibPowerBackup.movingtocalibfailafterlogindifferrentUser(
+                                        balance,
+                                        idsNo
+                                    );
+
+                                switch (CalibrationType) {
+                                    case "Periodic":
+                                        var selectRepSrNoObj = {
+                                            str_tableName: "tbl_calibration_periodic_master_incomplete",
+                                            data: "Periodic_RepNo",
+                                            condition: [
+                                                {
+                                                    str_colName: "Periodic_BalID",
+                                                    value: balance,
+                                                    comp: "eq",
+                                                },
+                                            ],
+                                        };
+                                        var result = await database.select(selectRepSrNoObj);
+                                        var int_periodic_RepNo = result[0][0].Periodic_RepNo;
+                                        await comman.calibfailmovingallcalibrationentries(
+                                            "P",
+                                            balance,
+                                            int_periodic_RepNo,
+                                            repnofordelete
+                                        );
+
+                                        break;
+
+                                    case "Eccentricity":
+                                        var selectRepSrNoObj = {
+                                            str_tableName:
+                                                "tbl_calibration_eccentricity_master_incomplete",
+                                            data: "Eccent_RepNo",
+                                            condition: [
+                                                {
+                                                    str_colName: "Eccent_BalID",
+                                                    value: balance,
+                                                    comp: "eq",
+                                                },
+                                            ],
+                                        };
+                                        var result = await database.select(selectRepSrNoObj);
+                                        var Eccent_RepNo = result[0][0].Eccent_RepNo;
+                                        await comman.calibfailmovingallcalibrationentries(
+                                            "E",
+                                            balance,
+                                            Eccent_RepNo,
+                                            repnofordelete
+                                        );
+                                        break;
+
+                                    case "Repeatability":
+                                        var selectRepSrNoObj = {
+                                            str_tableName:
+                                                "tbl_calibration_repetability_master_incomplete",
+                                            data: "Repet_RepNo",
+                                            condition: [
+                                                {
+                                                    str_colName: "Repet_BalID",
+                                                    value: balance,
+                                                    comp: "eq",
+                                                },
+                                            ],
+                                        };
+                                        var result = await database.select(selectRepSrNoObj);
+                                        var Repet_RepNo = result[0][0].Repet_RepNo;
+                                        await comman.calibfailmovingallcalibrationentries(
+                                            "R",
+                                            balance,
+                                            Repet_RepNo,
+                                            repnofordelete
+                                        );
+                                        break;
+
+                                    case "Uncertainty":
+                                        var selectRepSrNoObj = {
+                                            str_tableName:
+                                                "tbl_calibration_uncertinity_master_incomplete",
+                                            data: "Uncertinity_RepNo",
+                                            condition: [
+                                                {
+                                                    str_colName: "Uncertinity_BalID",
+                                                    value: balance,
+                                                    comp: "eq",
+                                                },
+                                            ],
+                                        };
+                                        var result = await database.select(selectRepSrNoObj);
+                                        var Uncertinity_RepNo = result[0][0].Uncertinity_RepNo;
+                                        await comman.calibfailmovingallcalibrationentries(
+                                            "U",
+                                            balance,
+                                            Uncertinity_RepNo,
+                                            repnofordelete
+                                        );
+                                        break;
+                                }
+
+                            }
+                        } else {
+                            if (CalibrationType != "Daily") {
+                                await CalibPowerBackup.movingtocalibfailafterlogindifferrentUser(
+                                    balance,
+                                    idsNo
+                                );
+                            }
+                        }
+                        ///
                     }
                 }
-                if(BalanceRecalibStatusObject.RecalibSetDt_periodic != null) {
+                if (BalanceRecalibStatusObject.RecalibSetDt_periodic != null) {
                     PeriodicDate = BalanceRecalibStatusObject.RecalibSetDt_periodic.toFormat('YYYY-MM-DD');
                     var todayDate = moment().format('YYYY-MM-DD');
-                    if((PeriodicDate < todayDate) && systemHours >= 7){
+                    if ((PeriodicDate < todayDate) && systemHours >= 7) {
                         BalanceRecalibStatusObject.RecalibSetDt_periodic = null;
                         BalanceRecalibStatusObject.PeriodicBalRecalib = 0;
                         // settting 0 to table
                         var objUpdate = {
-                            str_tableName:'tbl_recalibration_balance_status',
-                            data:[{str_colName:'PeriodicBalRecalib', value:0},
-                            {str_colName:'RecalibSetDt_periodic', value:null}],
-                            condition: [{str_colName:'Bal_ID', value:balance}]
+                            str_tableName: 'tbl_recalibration_balance_status',
+                            data: [{ str_colName: 'PeriodicBalRecalib', value: 0 },
+                            { str_colName: 'RecalibSetDt_periodic', value: null }],
+                            condition: [{ str_colName: 'Bal_ID', value: balance }]
                         }
                         await database.update(objUpdate);
+                        ///clearing powerbackup if (recalib periodic) entry is in powerbackup;
+                        var selectCalibPowerBackupData = {
+                            str_tableName: "tbl_calibpowerbackup",
+                            data: "*",
+                            condition: [
+                                { str_colName: "IdsNo", value: idsNo },
+                                { str_colName: "BalanceID", value: balance },
+                            ],
+                        };
+                        var result = await database.select(selectCalibPowerBackupData);
+                        if (result[0].length > 0) {
+                            var deleteObj = {
+                                str_tableName: "tbl_calibpowerbackup",
+                                condition: [
+                                    { str_colName: "IdsNo", value: idsNo },
+                                    { str_colName: "BalanceID", value: balance },
+                                ],
+                            };
+                            console.log(
+                                "calibpowerbakup discard  of recalibration on IDS " + idsNo
+                            );
+                            await database.delete(deleteObj);
+                            var CalibrationType = result[0][0].CalibrationType;
+                            if (CalibrationType != "Daily") {
+                                var repnofordelete =
+                                    await CalibPowerBackup.movingtocalibfailafterlogindifferrentUser(
+                                        balance,
+                                        idsNo
+                                    );
+
+                                switch (CalibrationType) {
+                                    case "Periodic":
+                                        var selectRepSrNoObj = {
+                                            str_tableName: "tbl_calibration_periodic_master_incomplete",
+                                            data: "Periodic_RepNo",
+                                            condition: [
+                                                {
+                                                    str_colName: "Periodic_BalID",
+                                                    value: balance,
+                                                    comp: "eq",
+                                                },
+                                            ],
+                                        };
+                                        var result = await database.select(selectRepSrNoObj);
+                                        var int_periodic_RepNo = result[0][0].Periodic_RepNo;
+                                        await comman.calibfailmovingallcalibrationentries(
+                                            "P",
+                                            balance,
+                                            int_periodic_RepNo,
+                                            repnofordelete
+                                        );
+
+                                        break;
+
+                                    case "Eccentricity":
+                                        var selectRepSrNoObj = {
+                                            str_tableName:
+                                                "tbl_calibration_eccentricity_master_incomplete",
+                                            data: "Eccent_RepNo",
+                                            condition: [
+                                                {
+                                                    str_colName: "Eccent_BalID",
+                                                    value: balance,
+                                                    comp: "eq",
+                                                },
+                                            ],
+                                        };
+                                        var result = await database.select(selectRepSrNoObj);
+                                        var Eccent_RepNo = result[0][0].Eccent_RepNo;
+                                        await comman.calibfailmovingallcalibrationentries(
+                                            "E",
+                                            balance,
+                                            Eccent_RepNo,
+                                            repnofordelete
+                                        );
+                                        break;
+
+                                    case "Repeatability":
+                                        var selectRepSrNoObj = {
+                                            str_tableName:
+                                                "tbl_calibration_repetability_master_incomplete",
+                                            data: "Repet_RepNo",
+                                            condition: [
+                                                {
+                                                    str_colName: "Repet_BalID",
+                                                    value: balance,
+                                                    comp: "eq",
+                                                },
+                                            ],
+                                        };
+                                        var result = await database.select(selectRepSrNoObj);
+                                        var Repet_RepNo = result[0][0].Repet_RepNo;
+                                        await comman.calibfailmovingallcalibrationentries(
+                                            "R",
+                                            balance,
+                                            Repet_RepNo,
+                                            repnofordelete
+                                        );
+                                        break;
+
+                                    case "Uncertainty":
+                                        var selectRepSrNoObj = {
+                                            str_tableName:
+                                                "tbl_calibration_uncertinity_master_incomplete",
+                                            data: "Uncertinity_RepNo",
+                                            condition: [
+                                                {
+                                                    str_colName: "Uncertinity_BalID",
+                                                    value: balance,
+                                                    comp: "eq",
+                                                },
+                                            ],
+                                        };
+                                        var result = await database.select(selectRepSrNoObj);
+                                        var Uncertinity_RepNo = result[0][0].Uncertinity_RepNo;
+                                        await comman.calibfailmovingallcalibrationentries(
+                                            "U",
+                                            balance,
+                                            Uncertinity_RepNo,
+                                            repnofordelete
+                                        );
+                                        break;
+                                }
+
+                            }
+                        } else {
+                            if (CalibrationType != "Daily") {
+                                await CalibPowerBackup.movingtocalibfailafterlogindifferrentUser(
+                                    balance,
+                                    idsNo
+                                );
+                            }
+
+                        }
+                        ///
                     }
                 }
             }
@@ -1154,48 +1427,112 @@ class FetchDetails {
                             condition: [{ str_colName: 'Bal_ID', value: balance }]
                         }
                         await database.update(objUpdate);
+                        ///clearing powerbackup if (recalib periodic) entry is in powerbackup;
+
+                        var selectCalibPowerBackupData = {
+                            str_tableName: "tbl_calibpowerbackup",
+                            data: "*",
+                            condition: [
+                                { str_colName: "IdsNo", value: idsNo },
+                                { str_colName: "BalanceID", value: binBalance },
+                            ],
+                        };
+                        var result = await database.select(selectCalibPowerBackupData);
+                        if (result[0].length > 0) {
+                            var deleteObj = {
+                                str_tableName: "tbl_calibpowerbackup",
+                                condition: [
+                                    { str_colName: "IdsNo", value: idsNo },
+                                    { str_colName: "BalanceID", value: binBalance },
+                                ],
+                            };
+                            console.log(
+                                "calibpowerbakup discard  of recalibration on IDS " + idsNo
+                            );
+                            await database.delete(deleteObj);
+                            if (result[0][0].CalibrationType != "Daily") {
+                                await CalibPowerBackup.movingtocalibfailaftercalibpowerbackupdiscard(
+                                    "5",
+                                    idsNo
+                                );
+                            }
+                        }
+
+                        ///
                     }
                 }
-                   if(BinBalanceRecalibStatusObject.RecalibSetDt_periodic != null) {
-                       PeriodicDate = BinBalanceRecalibStatusObject.RecalibSetDt_periodic.toFormat('YYYY-MM-DD');
-                       var todayDate = moment().format('YYYY-MM-DD');
-                       if((PeriodicDate < todayDate) && systemHours >= 7){
+                if (BinBalanceRecalibStatusObject.RecalibSetDt_periodic != null) {
+                    PeriodicDate = BinBalanceRecalibStatusObject.RecalibSetDt_periodic.toFormat('YYYY-MM-DD');
+                    var todayDate = moment().format('YYYY-MM-DD');
+                    if ((PeriodicDate < todayDate) && systemHours >= 7) {
                         BinBalanceRecalibStatusObject.RecalibSetDt_periodic = null;
                         BinBalanceRecalibStatusObject.PeriodicBalRecalib = 0;
-                           // settting 0 to table
-                           var objUpdate = {
-                               str_tableName:'tbl_recalibration_balance_status_bin',
-                               data:[{str_colName:'PeriodicBalRecalib', value:0},
-                               {str_colName:'RecalibSetDt_periodic', value:null}],
-                               condition: [{str_colName:'Bal_ID', value:balance}]
-                           }
-                           await database.update(objUpdate);
-                       }
-                   }
+                        // settting 0 to table
+                        var objUpdate = {
+                            str_tableName: 'tbl_recalibration_balance_status_bin',
+                            data: [{ str_colName: 'PeriodicBalRecalib', value: 0 },
+                            { str_colName: 'RecalibSetDt_periodic', value: null }],
+                            condition: [{ str_colName: 'Bal_ID', value: balance }]
+                        }
+                        await database.update(objUpdate);
+
+                        //powerbackup
+
+                        var selectCalibPowerBackupData = {
+                            str_tableName: "tbl_calibpowerbackup",
+                            data: "*",
+                            condition: [
+                                { str_colName: "IdsNo", value: idsNo },
+                                { str_colName: "BalanceID", value: binBalance },
+                            ],
+                        };
+                        var result = await database.select(selectCalibPowerBackupData);
+                        if (result[0].length > 0) {
+                            var deleteObj = {
+                                str_tableName: "tbl_calibpowerbackup",
+                                condition: [
+                                    { str_colName: "IdsNo", value: idsNo },
+                                    { str_colName: "BalanceID", value: binBalance },
+                                ],
+                            };
+                            console.log(
+                                "calibpowerbakup discard  of recalibration on IDS " + idsNo
+                            );
+                            await database.delete(deleteObj);
+                            if (result[0][0].CalibrationType != "Daily") {
+                                await CalibPowerBackup.movingtocalibfailaftercalibpowerbackupdiscard(
+                                    "5",
+                                    idsNo
+                                );
+                            }
+                        }
+
+                    }
+                }
             }
             if (vernier != 'None') {
                 var DailyDate = null;
                 var PeriodicDate = null;
                 var vernierData = globalData.arrVernier
-                var vernierRecalibStatusObject = globalData.arrVernierRecalibration.find(k=>k.Ver_ID == vernier);
-                if(vernierRecalibStatusObject!= undefined){
-                if(vernierRecalibStatusObject.RecalibSetDt_periodic != null) {
-                    PeriodicDate = vernierRecalibStatusObject.RecalibSetDt_periodic.toFormat('YYYY-MM-DD');
-                    var todayDate = moment().format('YYYY-MM-DD');
-                    if((PeriodicDate < todayDate) && systemHours >= 7){
-                        vernierRecalibStatusObject.RecalibSetDt_periodic = null;
-                        vernierRecalibStatusObject.PeriodicVerRecalib = 0;
-                        // settting 0 to table
-                        var objUpdate = {
-                            str_tableName:'tbl_recalibration_vernier_status',
-                            data:[{str_colName:'PeriodicVerRecalib', value:0},
-                            {str_colName:'RecalibSetDt_periodic', value:null}],
-                            condition: [{str_colName:'Ver_ID', value:vernier}]
+                var vernierRecalibStatusObject = globalData.arrVernierRecalibration.find(k => k.Ver_ID == vernier);
+                if (vernierRecalibStatusObject != undefined) {
+                    if (vernierRecalibStatusObject.RecalibSetDt_periodic != null) {
+                        PeriodicDate = vernierRecalibStatusObject.RecalibSetDt_periodic.toFormat('YYYY-MM-DD');
+                        var todayDate = moment().format('YYYY-MM-DD');
+                        if ((PeriodicDate < todayDate) && systemHours >= 7) {
+                            vernierRecalibStatusObject.RecalibSetDt_periodic = null;
+                            vernierRecalibStatusObject.PeriodicVerRecalib = 0;
+                            // settting 0 to table
+                            var objUpdate = {
+                                str_tableName: 'tbl_recalibration_vernier_status',
+                                data: [{ str_colName: 'PeriodicVerRecalib', value: 0 },
+                                { str_colName: 'RecalibSetDt_periodic', value: null }],
+                                condition: [{ str_colName: 'Ver_ID', value: vernier }]
+                            }
+                            await database.update(objUpdate);
                         }
-                        await database.update(objUpdate);
                     }
                 }
-            }
             }
             return 0;
         } catch (err) {
