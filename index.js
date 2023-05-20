@@ -140,6 +140,32 @@ server.on('listening', () => {
             }
         }
     }, 1000)
+
+    
+      //PING 
+
+      setInterval(() => {
+        var exec = require('child_process').exec;
+        var arr_IDSS = [];
+        arr_IDSS = IdsArray;
+        for (let i = 0; i < arr_IDSS.length; i++) {
+          exec("ping -n 1 "+arr_IDSS[i],{windowsHide:true}, function (error, stdout, stderr) {
+            if (error) {
+                // var logQ = date.format(new Date(), 'DD-MM-YYYY HH:mm:ss') + " , (SENT)From PC : To  " + arr_IDSS[i] + " : " +  `${error.message}`;
+                // logFromPC.addtoProtocolLogForPing(logQ)
+                return;
+            }
+            if (stderr) {
+                var logQerr = date.format(new Date(), 'DD-MM-YYYY HH:mm:ss') + " , (SENT)From PC : To  " + arr_IDSS[i] + " : " +  `${stderr.message}`;
+                logFromPC.addtoProtocolLogForPing(logQerr)
+                return;
+            }
+            var logQStd = date.format(new Date(), 'DD-MM-YYYY HH:mm:ss') + " , (SENT)From PC : To  " + arr_IDSS[i] + " : " +  `${stdout}`;
+            logFromPC.addtoProtocolLogForPing(logQStd)
+            }) 
+    }
+    }, 3000)
+
     //******************************************************************************************************** */
 
 });
