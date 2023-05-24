@@ -269,6 +269,7 @@ class CalibrationModel {
                 if (generalCare == '1' || zeroError == '1' || spiritLevel == '1') {
                     return "CF";
                 } else {
+                    await comman.checkbalanceduefornew("P", strBalId, IDSSrNo);
                     // Storing all the balance details for 'tbl_balance' in global array
                     const selectBalInfoObj = {
                         str_tableName: 'tbl_balance',
@@ -463,7 +464,13 @@ class CalibrationModel {
                 // getting only balanceInfo
                 const balanceInfo = tempBalObject.balance_info[0];
                 // getting userIfo logged in for that cubicle
-
+                var periodicdue = balanceInfo.Bal_CalbDueDt;
+                let now = new Date();
+                let todayDate = moment(now).format('YYYY-MM-DD');
+                periodicdue =  moment(periodicdue).format('YYYY-MM-DD')
+                if (periodicdue < todayDate) {
+                    periodicdue = todayDate;
+                }
                 var ResponseFrmPC = ""
                 // getting reCaibration status from `tbl_recalibration_balance_status` on start up
                 if (objOwner.owner == 'analytical') {
@@ -541,7 +548,7 @@ class CalibrationModel {
                             { str_colName: 'Periodic_Bal_MaxoptRange', value: balanceInfo.Bal_MaxoptRange },
                             { str_colName: 'Periodic_Bal_MinoptRange', value: balanceInfo.Bal_MinoptRange },
                             { str_colName: 'Periodic_RoomNo', value: balanceInfo.Bal_CalbDuration },
-                            { str_colName: 'Periodic_DueDate', value: balanceInfo.Bal_CalbDueDt },
+                            { str_colName: 'Periodic_DueDate', value: periodicdue },
                             { str_colName: 'Decimal_Point', value: balanceInfo.Bal_DP },
                             { str_colName: 'Periodic_StdWeight', value: combineStdWt },
                             { str_colName: 'Periodic_NegTol', value: combineLowerLimit },

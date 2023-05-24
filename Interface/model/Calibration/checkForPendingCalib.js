@@ -429,34 +429,29 @@ exports.checkIfTodayIsPeriodicCalib = async (IDSSrNo) => {
                 month = ("0" + month).slice(-2);
                 var year = today.getFullYear();
                 var arr_calibdates = []
-                for (let d of arr) {
-                    var day = ("0" + d).slice(-2)
-                    var date = '';
-                    date = year + '-' + month + '-' + day;
-                    let checkres = await checkPeriodicEntry(date, strBalId);
-                    if ((todayDate == date) && (checkres.length == 0)) {
-                        //logFromPC.addtoProtocolLog('Calibration Cause:Normal Routine(Todays)')
-                        console.log('today match', date)
-                        return true; // calibration Pending   
-                    } else if (date <= todayDate && checkres.length == 0) {
-                        let lastCalibDate = await checkIfLatestEntryResBal(strBalId);
-                        lastCalibDate = moment(lastCalibDate).format('YYYY-MM-DD')
-                        console.log('yesterday', date)
-                        if (lastCalibDate != 'no data') {
-                            if (date > lastCalibDate) {
-                                //logFromPC.addtoProtocolLog('Calibration Cause:Normal Routine(Previous)')
-                                return true;
-                            } else {
-                                continue;
-                            }
-                        } else {
-                            return false;
+                let calibDate = res[0][0].Bal_CalbDueDt;
+                calibDate = date1.format(calibDate, 'YYYY-MM-DD');
+                let checkres = await checkPeriodicEntry(calibDate, strBalId);
+                if ((todayDate == calibDate) && (checkres.length == 0)) {
+                    logFromPC.addtoProtocolLog('Calibration Cause:Normal Routine(Todays)')
+                    console.log('today match', calibDate)
+                    return true; // calibration Pending   
+                } else if (calibDate <= todayDate && checkres.length == 0) {
+                    let lastCalibDate = await checkIfLatestEntryResBal(strBalId);
+                    lastCalibDate = moment(lastCalibDate).format('YYYY-MM-DD')
+                    console.log('yesterday', calibDate)
+                    if (lastCalibDate != 'no data') {
+                        if (calibDate > lastCalibDate) {
+                            logFromPC.addtoProtocolLog('Calibration Cause:Normal Routine(Previous)')
+                            return true;
                         }
-
                     } else {
-                        console.log('false codition', date)
                         return false;
                     }
+
+                } else {
+                    console.log('false codition', calibDate)
+                    return false;
                 }
             }
         }
