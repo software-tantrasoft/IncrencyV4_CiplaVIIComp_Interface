@@ -319,7 +319,9 @@ class ProtocolHandler {
                             break;
                         // // If we get CR from IDS(calibration)
                         case "CR":
-                           
+                            this.sendProtocol("CR0", str_IpAddress);  //disable calibration on client side
+                            return;
+
                             let tempObj = globalData.arrUsers.find(k => k.IdsNo == idsNo);
                             objMonitor.monit({ case: 'ID', idsNo: idsNo, data: tempObj });
 
@@ -550,7 +552,17 @@ class ProtocolHandler {
                                             if (strReturnProtocol == "DIFUSER") {
                                                 this.handleProtocol("CRN￻", str_IpAddress, "");
                                             } else {
-                                                this.sendProtocol(strReturnProtocol, str_IpAddress);
+                                                if (!strReturnProtocol.includes("VI")) {
+                                                    var tempVerifyforfailed = await objCommanFun.calibrationVerificationafterfailed(idsNo);  //CR-54 UNable to login after calibration failed
+                                                    if (tempVerifyforfailed) {
+                                                        await this.sendProtocol(`ID3 UNABLE TO CONTINUE,VERIFY CALIBRATION,,`, str_IpAddress);
+                                                    }
+                                                    else {
+                                                        this.sendProtocol(strReturnProtocol, str_IpAddress);
+                                                    }
+                                                } else {
+                                                    this.sendProtocol(strReturnProtocol, str_IpAddress);
+                                                }
                                             }
 
                                         } else {
@@ -594,39 +606,20 @@ class ProtocolHandler {
                             break;
                         // if Caibration pending 
                         case "CP":
-                            objMonitor.monit({ case: 'CP', idsNo: idsNo });
-                            // For alerts if CP Protocol comes then calibration starts and we have to update flag that 
-                            // calibration is started and not to show alert
-                            let objFlagCalibWeigh = globalData.arr_FlagCallibWeighment.find(k => k.idsNo == idsNo);
-                            if (objFlagCalibWeigh != undefined) {
-                                objFlagCalibWeigh.alertFlag = true;
+                            var tempVerifyforfailed = await objCommanFun.calibrationVerificationafterfailed(idsNo);    //CR-54 UNable to login after calibration failed
+                            if (tempVerifyforfailed) {
+                                await this.sendProtocol(`ID3 UNABLE TO CONTINUE,VERIFY CALIBRATION,,`, str_IpAddress);
+                            } else {
+                                objMonitor.monit({ case: 'CP', idsNo: idsNo });
+                                // For alerts if CP Protocol comes then calibration starts and we have to update flag that 
+                                // calibration is started and not to show alert
+                                let objFlagCalibWeigh = globalData.arr_FlagCallibWeighment.find(k => k.idsNo == idsNo);
+                                if (objFlagCalibWeigh != undefined) {
+                                    objFlagCalibWeigh.alertFlag = true;
+                                }
+                                var strReturnProtocol = await caliDecider.calibPendingDecider(str_Protocol, str_IpAddress.split('.')[3]);
+                                this.sendProtocol(strReturnProtocol, str_IpAddress);
                             }
-                            // console.log(globalData.arr_FlagCallibWeighment)
-                            // let objUpdateCubicle = {
-                            //     str_tableName: 'tbl_cubical',
-                            //     data: [
-                            //         { str_colName: 'Sys_CalibInProcess', value: 1 },
-                            //     ],
-                            //     condition: [
-                            //         { str_colName: 'Sys_IDSNo', value: idsNo }
-                            //     ]
-                            // }
-                            // console.log('Sys_CalibInProcess set from CP=1')
-                            // await database.update(objUpdateCubicle);
-                            var strReturnProtocol = await caliDecider.calibPendingDecider(str_Protocol, str_IpAddress.split('.')[3]);
-
-                            //COMMENT THIS LINE FOR REGULAR ROUTINE***********************************
-                            //Added by vivek on 24-04-2020 11:05
-                            // this if added for protocol validation..
-                            // only 3 commas are allowed  AND No need to send TAREA COMMAND
-                            // var count = (strReturnProtocol.match(/,/g) || []).length;
-                            // if (count > 3){
-                            //     strReturnProtocol =  strReturnProtocol.substring(0,strReturnProtocol.length-1)
-                            // }
-                            //******************************************************************* */
-
-                            this.sendProtocol(strReturnProtocol, str_IpAddress);
-
                             break;
                         // for incoming calibration weights 
                         case "CB":
