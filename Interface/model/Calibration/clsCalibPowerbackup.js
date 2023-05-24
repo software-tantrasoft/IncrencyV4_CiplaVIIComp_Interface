@@ -458,7 +458,7 @@ class CalibPowerBackup {
           break;
       }
 
-      if (CalibrationType != "D" || CalibrationType != "1") {
+      if (CalibrationType != "D" && CalibrationType != "1") {
         await this.movingtocalibfailaftercalibpowerbackupdiscard(
           CalibrationType,
           IdsNo
